@@ -1,0 +1,230 @@
+---
+title: "Assignment 1"
+author: "Shikan Chen &"
+format: 
+  revealjs:
+    css: style.css
+editor: visual
+---
+
+# Download the Data
+
+Countries selected: Singapore and Ireland
+
+# Read the Data
+
+```{r, echo=TRUE}
+# Load the required package
+library(data.table)
+library(ggplot2)
+
+# Read the data for Singapore and Ireland, removing the first row as the metadata
+spg_data <- fread("hdro_indicators_sgp.csv")[-1,]
+irl_data <- fread("hdro_indicators_irl.csv")[-1,]
+
+```
+
+## Peak of spg_data
+
+```{r, echo=TRUE}
+head(spg_data)
+```
+
+## Peak of irl_data
+
+```{r, echo=TRUE}
+head(irl_data)
+```
+
+# Merge the data
+
+We need to assign the Correct Class to Variables for merging
+
+```{r, echo=TRUE}
+# Merge the datasets
+merged_data <- unique(rbind(spg_data, irl_data, use.names=TRUE))
+```
+
+# Quick Data Exploration
+
+Summary statistics
+
+Unique indicator names
+
+Range of years in the dataset
+
+Number of records per country
+
+## Summary statistics
+
+```{r, echo=TRUE}
+summary(merged_data)
+```
+
+## Unique indicator names
+
+```{r, echo=TRUE}
+# Unique indicator names
+unique_indicators <- unique(merged_data$indicator_name)
+print(unique_indicators)
+```
+
+## Range of years in the dataset
+
+```{r, echo=TRUE}
+# Range of years in the dataset
+year_range <- range(merged_data$year, na.rm = TRUE)
+print(year_range)
+```
+
+## Number of records per country
+
+```{r, echo=TRUE}
+# Number of records per country
+records_per_country <- merged_data[, .N, by = country_name]
+print(records_per_country)
+```
+
+## From Quick Data Exploration Results
+
+We note that
+
+-   The dataset contains 1,788 rows and 8 columns.
+-   All columns are character types. We'll need to convert some columns to numeric or integer types for further analysis.
+-   Unique indicator names and years range from 1990 to 2022.
+-   The number of records per country:
+    -   Singapore: 894 records
+    -   Ireland: 894 records
+
+# Data Analysis
+
+## Aggregate data for annual average Adolescent Birth Rate in Singapore
+
+```{r, echo=TRUE}
+
+# Ensure 'value' is numeric
+merged_data[, value := as.numeric(value)]
+
+# Calculate the annual average Adolescent Birth Rate in Singapore
+annual_avg_adol_birth_rate <- merged_data[indicator_name == "Adolescent Birth Rate (births per 1,000 women ages 15-19)" & country_name == "Singapore", .(Average_Birth_Rate = mean(value, na.rm = TRUE)), keyby = .(year)]
+
+# Print the annual average data
+head(annual_avg_adol_birth_rate)
+```
+
+## Analysis
+
+**Overall Trend**:
+
+-   The adolescent birth rate has shown a consistent decline over the 32-year period.
+
+-   Starting from a rate of 8.918 births per 1000 women aged 15-19 in 1990, it reduced to 2.462 by 2022.
+
+**Rate of Decline**:
+
+-   The rate of decline was not uniform but was more pronounced in the later years. For example, from 2016 to 2017, the drop from 2.393 to 2.275 represents one of the sharper year-over-year declines in the dataset.
+
+-   The largest year-over-year percentage decrease appears to be after 2015, highlighting potentially effective interventions or changes in societal behavior around that time.
+
+## Aggregate data for average of each indicator by gender across years
+
+```{r, echo=TRUE}
+# Calculate the average of each indicator by gender across years
+gender_analysis <- merged_data[indicator_name %in% c("Labour force participation rate, female (% ages 15 and older)", "Labour force participation rate, male (% ages 15 and older)", "Mean Years of Schooling, female (years)", "Mean Years of Schooling, male (years)"), .(Average_Value = mean(value, na.rm = TRUE)), keyby = .(indicator_name, country_name)]
+
+# Output the result
+print(gender_analysis)
+```
+
+## Analysis
+
+**Labor Force Participation Rate**:
+
+-   Singapore: Males (73.62%) have a higher participation rate than females (51.98%).
+
+-   Ireland: Similar to Singapore, males (70.07%) have a higher participation rate than females (49.74%).
+
+-   Comparison: The gender gap in labor force participation is slightly wider in Singapore than in Ireland.
+
+**Mean Years of Schooling**:
+
+-   Singapore: Males (10.47 years) have slightly more schooling on average compared to females (9.51 years).
+
+-   Ireland: Females (10.35 years) have nearly the same years of schooling as males (10.02 years).
+
+-   Comparison: Ireland shows less disparity in education between genders compared to Singapore.
+
+# Plot using some output from the analysis
+
+## Plot 1
+
+for the differences in labor force participation and educational attainment between males and females in both countries
+
+```{r, echo=TRUE}
+library(dplyr)
+
+# Transform data for plotting
+plot_data <- gender_analysis %>%
+  mutate(Gender = ifelse(grepl("female", indicator_name), "Female", "Male"),
+         Indicator = gsub(" .+$", "", indicator_name)) %>%
+  select(country_name, Gender, Indicator, Average_Value)
+
+# Create the plot
+ggplot(plot_data, aes(x = Indicator, y = Average_Value, fill = Gender)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  facet_wrap(~country_name) +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(title = "Gender Comparison in Labor Force Participation and Education",
+       x = "Indicator",
+       y = "Average Value (%)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Analysis
+
+**Labor Force Participation**:
+
+-   Ireland: Males show a significantly higher labor force participation rate compared to females.
+
+-   Singapore: A similar trend is observed; however, the gender gap is somewhat less pronounced than in Ireland, yet still substantial.
+
+**Mean Years of Schooling**:
+
+-   Ireland: The mean years of schooling are slightly higher for males than for females, indicating a marginal gender disparity in educational attainment.
+
+-   Singapore: Contrary to Ireland, males in Singapore also have higher mean years of schooling than females, with a noticeable difference suggesting a persistent educational gap.
+
+## Plot 2
+
+for point comparison of gender indicators between ireland and Singapore
+
+```{r, echo=TRUE}
+
+# Ensure to numeric
+annual_avg_adol_birth_rate$year <- as.numeric(annual_avg_adol_birth_rate$year)
+
+# Create the line plot
+ggplot(annual_avg_adol_birth_rate, aes(x = year, y = Average_Birth_Rate)) +
+  geom_line(color = "steelblue") +
+  geom_point(color = "darkred") +
+  labs(title = "Annual Average Adolescent Birth Rate from 1990 to 2012",
+       x = "Year",
+       y = "Average Birth Rate (per 1,000 women ages 15-19)") +
+  theme_minimal() +
+  # Annotations to highlight specific years or changes
+  geom_text(aes(label = ifelse(year %in% c(1990, 2000, 2010), as.character(year), "")), 
+            nudge_y = 0.2, check_overlap = TRUE, color = "darkgreen") +
+  geom_text(aes(label = ifelse(year %in% c(1990, 2000, 2010), 
+                               sprintf("%.3f", Average_Birth_Rate), ""), 
+                year, Average_Birth_Rate), 
+            vjust = -1.5, hjust = 0.5, check_overlap = TRUE, color = "blue")
+```
+
+## Analysis
+
+-   The graph shows a steady decrease in the adolescent birth rate over the 22-year period, from 8.918 births per 1,000 women in 1990 to 4.700 births per 1,000 women in 2012.
+
+-   There are noticeable fluctuations in the early years, particularly a sharp increase in 2000 when the rate peaked at 8.863 before beginning a more pronounced decline.
+
+-   The year 2010 marks the onset of the most rapid declines in the series, reaching rates below 5 births per 1,000 by the end of the period observed.

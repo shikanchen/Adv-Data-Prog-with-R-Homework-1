@@ -1,0 +1,16 @@
+.reveal .slides {
+  font-size: 0.8em;
+}
+
+
+.reveal .plot-container {
+  width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+
+.reveal .plot-container svg {
+  width: 100%;
+  height: auto;
+}
